@@ -1,0 +1,44 @@
+﻿2026-05-19T02:03:45.6980935Z ##[group]Run python test_gha.py
+2026-05-19T02:03:45.6981261Z [36;1mpython test_gha.py[0m
+2026-05-19T02:03:45.7019572Z shell: /usr/bin/bash -e {0}
+2026-05-19T02:03:45.7019808Z env:
+2026-05-19T02:03:45.7020059Z   pythonLocation: /opt/hostedtoolcache/Python/3.11.15/x64
+2026-05-19T02:03:45.7020469Z   PKG_CONFIG_PATH: /opt/hostedtoolcache/Python/3.11.15/x64/lib/pkgconfig
+2026-05-19T02:03:45.7021072Z   Python_ROOT_DIR: /opt/hostedtoolcache/Python/3.11.15/x64
+2026-05-19T02:03:45.7021418Z   Python2_ROOT_DIR: /opt/hostedtoolcache/Python/3.11.15/x64
+2026-05-19T02:03:45.7021763Z   Python3_ROOT_DIR: /opt/hostedtoolcache/Python/3.11.15/x64
+2026-05-19T02:03:45.7022127Z   LD_LIBRARY_PATH: /opt/hostedtoolcache/Python/3.11.15/x64/lib
+2026-05-19T02:03:45.7022447Z ##[endgroup]
+2026-05-19T02:03:47.1349340Z === Test 1: urllib (bare) ===
+2026-05-19T02:03:47.1350043Z Status: 403
+2026-05-19T02:03:47.1350373Z CLOUDFLARE BLOCK PAGE
+2026-05-19T02:03:47.1350572Z 
+2026-05-19T02:03:47.1350702Z === Test 2: urllib (Chrome UA) ===
+2026-05-19T02:03:47.1351118Z Status: 202
+2026-05-19T02:03:47.1351375Z First 500: <!DOCTYPE html>
+2026-05-19T02:03:47.1351658Z <html lang="en">
+2026-05-19T02:03:47.1351906Z <head>
+2026-05-19T02:03:47.1352168Z     <meta charset="utf-8">
+2026-05-19T02:03:47.1352659Z     <meta name="viewport" content="width=device-width, initial-scale=1">
+2026-05-19T02:03:47.1353208Z     <title></title>
+2026-05-19T02:03:47.1353793Z     <style>
+2026-05-19T02:03:47.1354050Z         body {
+2026-05-19T02:03:47.1354349Z             font-family: "Arial";
+2026-05-19T02:03:47.1354699Z         }
+2026-05-19T02:03:47.1354939Z     </style>
+2026-05-19T02:03:47.1355235Z     <script type="text/javascript">
+2026-05-19T02:03:47.1356206Z     window.awsWafCookieDomainList = ['deepseek.com','www.deepseek.com','chat.deepseek.com','platform.deepseek.com','api.deepseek.com','api-docs.deepseek.com'];
+2026-05-19T02:03:47.1357186Z     window.gokuProps = {
+2026-05-19T02:03:47.1357663Z "key":"AQIDAHjcYu/GjX+QlghicBgQ/7bF
+2026-05-19T02:03:47.1357931Z 
+2026-05-19T02:03:47.1358088Z === Test 3: cloudscraper ===
+2026-05-19T02:03:47.1358429Z Status: 202
+2026-05-19T02:03:47.1358722Z x-amzn-waf-action: challenge
+2026-05-19T02:03:47.1359065Z AWS WAF CHALLENGE PAGE
+2026-05-19T02:03:47.1359266Z 
+2026-05-19T02:03:47.1359406Z === Test 4: API endpoint ===
+2026-05-19T02:03:47.1431606Z Status: 200
+2026-05-19T02:03:47.1432227Z Body: {"code":0,"msg":"","data":{"biz_code":2,"biz_msg":"RECAPTCHA_VERIFY_FAILED","biz_data":null}}
+2026-05-19T02:03:47.1432734Z 
+2026-05-19T02:03:47.1432865Z === Test 5: curl_cffi ===
+2026-05-19T02:03:47.1433217Z curl_cffi not installed
