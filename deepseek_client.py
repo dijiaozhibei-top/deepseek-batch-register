@@ -37,7 +37,7 @@ class DeepSeekAPIClient:
         }
 
         try:
-            resp = self.session.post(url, json=payload, timeout=30)
+            resp = self.session.post(url, data=json.dumps(payload), timeout=30)
             logger.debug(f"send-code: status={resp.status_code}, body={resp.text[:500]}")
 
             if resp.status_code == 200:
@@ -49,7 +49,7 @@ class DeepSeekAPIClient:
                     logger.warning(f"[{email}] 返回: {data}")
                     return False
             elif resp.status_code == 422:
-                logger.error(f"[{email}] 需要Turnstile验证: {resp.text[:300]}")
+                logger.error(f"[{email}] 参数错误: {resp.text[:500]}")
                 return False
             else:
                 logger.error(f"[{email}] HTTP {resp.status_code}: {resp.text[:300]}")
