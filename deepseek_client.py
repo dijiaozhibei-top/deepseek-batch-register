@@ -48,6 +48,7 @@ class DeepSeekAPIClient:
             "scenario": "register",
             "device_id": str(uuid.uuid4()),
             "locale": "en_US",
+            "turnstile_token": "",
         }
 
         try:
