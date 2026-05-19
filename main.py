@@ -3,9 +3,10 @@ import logging
 import os
 import sys
 import time
+import asyncio
 
 import config
-from deepseek_client import DeepSeekClient
+from playwright_register import DeepSeekPlaywrightRegister
 from email_client import EmailClient
 
 os.makedirs("logs", exist_ok=True)
@@ -40,9 +41,9 @@ def build_alias_email(base_account: str, index: int) -> str:
     return f"{name}+{index}@{domain}"
 
 
-def main():
+async def main_async():
     logger.info("=" * 50)
-    logger.info("DeepSeek 批量注册工具启动")
+    logger.info("DeepSeek 批量注册工具启动 (Playwright)")
     logger.info(f"目标邮箱: {config.GMAIL_ACCOUNT}")
     logger.info(f"注册数量: {config.COUNT}")
     logger.info(f"起始索引: {config.START_INDEX}")
@@ -59,15 +60,16 @@ def main():
         logger.info(f"\n--- 正在注册第 {i} 个账号: {alias_email} ---")
 
         try:
-            client = DeepSeekClient(
+            client = DeepSeekPlaywrightRegister(
                 base_url=config.DEEPSEEK_BASE_URL,
                 proxy=config.PROXY,
+                headless=True,
             )
 
-            result = client.register_account(
+            result = await client.register_account(
                 email=alias_email,
                 password_length=config.PASSWORD_LENGTH,
-                max_code_retries=15,
+                code_retries=12,
                 code_interval=10,
             )
 
@@ -93,6 +95,10 @@ def main():
     logger.info("=" * 50)
 
     return 0 if fail_count == 0 else 1
+
+
+def main():
+    return asyncio.run(main_async())
 
 
 if __name__ == "__main__":
