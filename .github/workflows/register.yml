@@ -39,6 +39,12 @@ jobs:
           pip install -r requirements.txt
           pip install nodriver
 
+      - name: Install Chromium for nodriver
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y chromium-browser
+          echo "CHROME_PATH=$(which chromium-browser)" >> $GITHUB_ENV
+
       - name: Run batch register
         env:
           GMAIL_ACCOUNT: ${{ secrets.GMAIL_ACCOUNT }}

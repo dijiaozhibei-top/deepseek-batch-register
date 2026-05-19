@@ -44,11 +44,8 @@ class DeepSeekAPIClient:
 
     def _solve_turnstile(self) -> str | None:
         try:
-            from turnstile_solver import TurnstileSolver
-            ts = TurnstileSolver()
-            token = ts.get_token_sync(max_wait=60)
-            ts.stop()
-            return token
+            from turnstile_solver import solve_turnstile
+            return solve_turnstile(max_wait=90)
         except Exception as e:
             logger.error(f"Turnstile求解失败: {e}")
             return None

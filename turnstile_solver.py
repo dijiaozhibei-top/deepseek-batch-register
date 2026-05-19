@@ -5,49 +5,43 @@ import nodriver as uc
 logger = logging.getLogger(__name__)
 
 TURNSTILE_SITEKEY = "0x4AAAAAAA1jQEh8YFk064tz"
+SIGNUP_URL = "https://chat.deepseek.com/sign_up"
 
 
-class TurnstileSolver:
-    def __init__(self):
-        self.browser = None
+async def get_turnstile_token(max_wait: int = 90) -> str | None:
+    browser = None
+    try:
+        browser = await uc.start(
+            headless=True,
+            additional_arguments=[
+                "--disable-blink-features=AutomationControlled",
+                "--no-sandbox",
+                "--disable-dev-shm-usage",
+                "--window-size=1920,1080",
+            ],
+        )
 
-    async def _ensure_browser(self):
-        if self.browser is None:
-            self.browser = await uc.start(
-                headless=True,
-                additional_arguments=[
-                    "--disable-blink-features=AutomationControlled",
-                    "--no-sandbox",
-                    "--disable-dev-shm-usage",
-                    "--window-size=1920,1080",
-                ],
-            )
+        page = await browser.get(SIGNUP_URL)
+        await page.sleep(8)
 
-    async def get_token(self, max_wait: int = 60) -> str | None:
-        await self._ensure_browser()
-
-        page = await self.browser.get("https://chat.deepseek.com/sign_up")
-        await page.sleep(5)
-
-        # Wait for page to load and WAF to be solved
         for i in range(max_wait // 3):
             await page.sleep(3)
 
-            # Check if blocked by Cloudflare
-            html = await page.get_content()
-            if "ERROR" in html[:500] and "request could not be satisfied" in html[:500]:
-                logger.error("Page blocked by Cloudflare WAF")
-                return None
-
-            # Check if Turnstile object is available
-            has_turnstile = await page.evaluate(
-                "typeof turnstile !== 'undefined'"
-            )
-            if not has_turnstile:
-                # Maybe still loading, wait
+            try:
+                html = await page.get_content()
+            except Exception:
                 continue
 
-            # Turnstile is available, render a widget and get token
+            if "ERROR" in html[:500] and "request could not be satisfied" in html[:500]:
+                logger.error("Cloudflare WAF blocked the page")
+                return None
+
+            has_turnstile = await page.evaluate(
+                "typeof turnstile !== 'undefined' && turnstile !== null"
+            )
+            if not has_turnstile:
+                continue
+
             token = await page.evaluate(f"""
                 () => new Promise((resolve) => {{
                     try {{
@@ -78,11 +72,24 @@ class TurnstileSolver:
 
         logger.error("Timed out waiting for Turnstile token")
         return None
+    finally:
+        if browser:
+            try:
+                await browser.stop()
+            except Exception:
+                pass
 
-    async def stop(self):
-        if self.browser:
-            await self.browser.stop()
-            self.browser = None
 
-    def get_token_sync(self, max_wait: int = 60) -> str | None:
-        return asyncio.run(self.get_token(max_wait))
+def solve_turnstile(max_wait: int = 90) -> str | None:
+    """Synchronous wrapper for get_turnstile_token."""
+    try:
+        return asyncio.run(get_turnstile_token(max_wait))
+    except RuntimeError as e:
+        # Handle case where event loop is already running
+        logger.warning(f"Event loop conflict, trying new loop: {e}")
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        try:
+            return loop.run_until_complete(get_turnstile_token(max_wait))
+        finally:
+            loop.close()
