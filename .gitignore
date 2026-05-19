@@ -6,3 +6,5 @@ accounts.csv
 check_logs.py
 get_logs.py
 get_logs2.py
+wait_run.py
+check_run_logs.py

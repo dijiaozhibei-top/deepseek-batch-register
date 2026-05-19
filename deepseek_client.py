@@ -1,9 +1,7 @@
 import json
 import logging
-import os
 import random
 import string
-import time
 
 from curl_cffi import requests
 
@@ -13,8 +11,7 @@ logger = logging.getLogger(__name__)
 class DeepSeekClient:
     def __init__(self, base_url: str = "https://chat.deepseek.com", proxy: str = ""):
         self.base_url = base_url.rstrip("/")
-        self.session = requests.Session()
-        self.session.impersonate = "chrome120"
+        self.session = requests.Session(impersonate="chrome131")
 
         if proxy:
             self.session.proxies = {
@@ -25,43 +22,41 @@ class DeepSeekClient:
 
         self.session.headers.update({
             "Accept": "application/json, text/plain, */*",
-            "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8",
+            "Accept-Language": "en-US,en;q=0.9",
             "Content-Type": "application/json",
             "Origin": self.base_url,
-            "Referer": f"{self.base_url}/",
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            "Referer": f"{self.base_url}/sign_up",
         })
 
-    def _generate_password(self, length: int = 16) -> str:
-        chars = string.ascii_letters + string.digits
-        password = [
-            random.choice(string.ascii_uppercase),
-            random.choice(string.ascii_lowercase),
-            random.choice(string.digits),
-        ]
-        password += [random.choice(chars) for _ in range(length - len(password))]
-        random.shuffle(password)
-        return "".join(password)
+        self.session.get(self.base_url, timeout=15)
 
     def send_code(self, email: str) -> bool:
         url = f"{self.base_url}/api/v0/users/send-code"
         payload = {"email": email}
 
         try:
-            resp = self.session.post(url, json=payload)
+            resp = self.session.post(url, json=payload, timeout=30)
+            logger.debug(f"[{email}] send-code status={resp.status_code}, body={resp.text[:300]}")
+
             if resp.status_code in (200, 201):
-                data = resp.json()
+                try:
+                    data = resp.json()
+                except Exception:
+                    logger.error(f"[{email}] 响应不是合法JSON: status={resp.status_code}, body={resp.text[:500]}")
+                    return False
+
                 if data.get("code") == 0 or data.get("success") is not False:
                     logger.info(f"[{email}] 验证码发送成功")
                     return True
                 else:
-                    logger.warning(f"[{email}] 发送验证码返回异常: {data}")
+                    logger.warning(f"[{email}] 返回异常: {data}")
                     return False
             else:
-                logger.error(f"[{email}] 发送验证码失败 HTTP {resp.status_code}: {resp.text[:200]}")
+                logger.error(f"[{email}] HTTP {resp.status_code}: {resp.text[:300]}")
                 return False
+
         except Exception as e:
-            logger.error(f"[{email}] 发送验证码请求异常: {e}")
+            logger.error(f"[{email}] 请求异常: {e}")
             return False
 
     def register(self, email: str, code: str, password: str) -> dict | None:
@@ -73,9 +68,16 @@ class DeepSeekClient:
         }
 
         try:
-            resp = self.session.post(url, json=payload)
+            resp = self.session.post(url, json=payload, timeout=30)
+            logger.debug(f"[{email}] register status={resp.status_code}, body={resp.text[:300]}")
+
             if resp.status_code in (200, 201):
-                data = resp.json()
+                try:
+                    data = resp.json()
+                except Exception:
+                    logger.error(f"[{email}] 响应不是合法JSON: status={resp.status_code}, body={resp.text[:500]}")
+                    return None
+
                 if data.get("code") == 0:
                     token = (
                         data.get("data", {}).get("biz_data", {}).get("user", {}).get("token")
@@ -89,14 +91,26 @@ class DeepSeekClient:
                         "raw_response": data,
                     }
                 else:
-                    logger.warning(f"[{email}] 注册返回异常: {data}")
+                    logger.warning(f"[{email}] 返回异常: {data}")
                     return None
             else:
-                logger.error(f"[{email}] 注册失败 HTTP {resp.status_code}: {resp.text[:300]}")
+                logger.error(f"[{email}] HTTP {resp.status_code}: {resp.text[:300]}")
                 return None
+
         except Exception as e:
-            logger.error(f"[{email}] 注册请求异常: {e}")
+            logger.error(f"[{email}] 请求异常: {e}")
             return None
+
+    def _generate_password(self, length: int = 16) -> str:
+        chars = string.ascii_letters + string.digits
+        password = [
+            random.choice(string.ascii_uppercase),
+            random.choice(string.ascii_lowercase),
+            random.choice(string.digits),
+        ]
+        password += [random.choice(chars) for _ in range(length - len(password))]
+        random.shuffle(password)
+        return "".join(password)
 
     def register_account(self, email: str, password_length: int = 16,
                          max_code_retries: int = 15, code_interval: int = 10) -> dict | None:
