@@ -92,25 +92,35 @@ class DeepSeekPlaywrightRegister:
                 sign_up_url = f"{self.base_url}/sign_up"
                 logger.info(f"[{email}] 打开页面: {sign_up_url}")
                 await page.goto(sign_up_url, timeout=60000, wait_until="networkidle")
-                await asyncio.sleep(3)
+                await asyncio.sleep(5)
 
-                logo_detected = await page.query_selector("img[alt='DeepSeek'], img[alt='深度求索'], ._sri-logo")
-                if logo_detected:
-                    current_url = page.url
-                    if "sign_up" not in current_url and "auth" not in current_url:
-                        logger.info(f"[{email}] 页面被重定向到: {current_url}")
-                        await page.goto(sign_up_url, timeout=30000, wait_until="networkidle")
-                        await asyncio.sleep(2)
+                current_url = page.url
+                logger.info(f"[{email}] 当前URL: {current_url}")
+
+                page_title = await page.title()
+                page_html = await page.content()
+                logger.info(f"[{email}] 页面标题: {page_title}")
+                logger.debug(f"[{email}] 页面HTML (前2000字): {page_html[:2000]}")
+
+                if "sign_up" not in current_url and "auth" not in current_url and "login" not in current_url:
+                    logger.info(f"[{email}] 页面被重定向到: {current_url}，尝试直接导航到sign_up")
+                    await page.goto(sign_up_url, timeout=30000, wait_until="networkidle")
+                    await asyncio.sleep(3)
 
                 email_input = await page.wait_for_selector(
-                    "input[type='email'], input[type='text'], input[placeholder*='mail'], input[name='email']",
-                    timeout=15000
+                    "input[type='email'], input[placeholder*='mail'], input[name='email'], input:not([type='hidden'])",
+                    timeout=30000
                 )
                 if not email_input:
                     inputs = await page.query_selector_all("input")
+                    logger.info(f"[{email}] 页面共 {len(inputs)} 个input元素")
+                    for idx, inp in enumerate(inputs):
+                        html = await page.evaluate("el => el.outerHTML", inp)
+                        logger.info(f"  input[{idx}]: {html[:200]}")
                     for inp in inputs:
                         placeholder = await inp.get_attribute("placeholder") or ""
-                        if "mail" in placeholder.lower() or "email" in placeholder.lower():
+                        input_type = await inp.get_attribute("type") or ""
+                        if "mail" in placeholder.lower() or "email" in placeholder.lower() or input_type == "email":
                             email_input = inp
                             break
 
