@@ -42,13 +42,29 @@ class DeepSeekAPIClient:
         body = resp.read().decode("utf-8", errors="replace")
         return resp.status, body
 
+    def _solve_turnstile(self) -> str | None:
+        try:
+            from turnstile_solver import TurnstileSolver
+            ts = TurnstileSolver()
+            token = ts.get_token_sync(max_wait=60)
+            ts.stop()
+            return token
+        except Exception as e:
+            logger.error(f"Turnstile求解失败: {e}")
+            return None
+
     def send_code(self, email: str) -> bool:
+        token = self._solve_turnstile()
+        if not token:
+            logger.error(f"[{email}] 无法获取Turnstile token，跳过")
+            return False
+
         payload = {
             "email": email,
             "scenario": "register",
             "device_id": str(uuid.uuid4()),
             "locale": "en_US",
-            "turnstile_token": "",
+            "turnstile_token": token,
         }
 
         try:
