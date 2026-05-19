@@ -1,0 +1,63 @@
+name: DeepSeek Batch Register
+
+on:
+  workflow_dispatch:
+    inputs:
+      count:
+        description: 注册数量
+        required: true
+        default: "3"
+      start_index:
+        description: 起始索引
+        required: true
+        default: "1"
+      target:
+        description: 目标站点 (chat / platform)
+        required: true
+        default: "chat"
+        type: choice
+        options:
+          - chat
+          - platform
+  schedule:
+    - cron: "0 0 */7 * *"
+
+jobs:
+  register:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run batch register
+        env:
+          GMAIL_ACCOUNT: ${{ secrets.GMAIL_ACCOUNT }}
+          GMAIL_PASSWORD: ${{ secrets.GMAIL_PASSWORD }}
+          REGISTER_COUNT: ${{ inputs.count || '3' }}
+          START_INDEX: ${{ inputs.start_index || '1' }}
+          DEEPSEEK_BASE_URL: ${{ inputs.target == 'platform' && 'https://platform.deepseek.com' || 'https://chat.deepseek.com' }}
+        run: python main.py
+
+      - name: Upload accounts
+        uses: actions/upload-artifact@v4
+        with:
+          name: deepseek-accounts
+          path: accounts.csv
+          retention-days: 30
+
+      - name: Upload logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: register-logs
+          path: logs/
+          retention-days: 7
