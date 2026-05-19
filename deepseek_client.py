@@ -43,40 +43,38 @@ class DeepSeekAPIClient:
         return resp.status, body
 
     def send_code(self, email: str) -> bool:
-        payload = {
-            "email": email,
-            "turnstile_token": "any",
-            "device_id": str(uuid.uuid4()),
-            "scenario": "signUp",
-            "locale": "en_US",
-        }
+        payload_configs = [
+            {"email": email, "scenario": "signUp"},
+            {"email": email, "scenario": "register"},
+            {"email": email, "scenario": "sign_up"},
+            {"email": email},
+        ]
 
-        try:
-            status, body = self._request("POST", "/api/v0/users/create_email_verification_code", payload)
-            logger.debug(f"send-code: status={status}, body={body[:500]}")
+        for payload in payload_configs:
+            try:
+                status, body = self._request("POST", "/api/v0/users/create_email_verification_code", payload)
+                logger.info(f"[{email}] 尝试 {payload} -> status={status}, body={body[:300]}")
 
-            if status == 200:
-                data = json.loads(body)
-                if data.get("code") == 0:
-                    logger.info(f"[{email}] 验证码发送成功")
-                    return True
+                if status == 200:
+                    data = json.loads(body)
+                    if data.get("code") == 0:
+                        logger.info(f"[{email}] 验证码发送成功")
+                        return True
+                elif status == 422:
+                    continue
                 else:
-                    logger.warning(f"[{email}] 返回: {data}")
+                    logger.error(f"[{email}] HTTP {status}: {body[:300]}")
                     return False
-            elif status == 422:
-                logger.error(f"[{email}] 参数错误: {body[:500]}")
-                return False
-            else:
-                logger.error(f"[{email}] HTTP {status}: {body[:300]}")
-                return False
+            except urllib.error.HTTPError as e:
+                body = e.read().decode("utf-8", errors="replace")
+                logger.warning(f"[{email}] 尝试 {payload} -> HTTP {e.code}: {body[:200]}")
+                continue
+            except Exception as e:
+                logger.warning(f"[{email}] 尝试 {payload} -> 异常: {e}")
+                continue
 
-        except urllib.error.HTTPError as e:
-            body = e.read().decode("utf-8", errors="replace")
-            logger.error(f"[{email}] HTTP {e.code}: {body[:300]}")
-            return False
-        except Exception as e:
-            logger.error(f"[{email}] 异常: {e}")
-            return False
+        logger.error(f"[{email}] 所有payload配置均失败")
+        return False
 
     def register(self, email: str, code: str, password: str) -> dict | None:
         payload = {
