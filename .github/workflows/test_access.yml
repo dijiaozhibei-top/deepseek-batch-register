@@ -1,0 +1,78 @@
+name: Test GHA access to sign_up
+on: workflow_dispatch
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Test sign_up page access
+        run: |
+          python -c "
+import urllib.request, json
+
+# Test 1: urllib - normal Python requests
+print('=== Test 1: urllib (no custom UA) ===')
+try:
+    r = urllib.request.urlopen('https://chat.deepseek.com/sign_up', timeout=15)
+    print(f'Status: {r.status}')
+    print(f'Headers: {json.dumps(dict(r.headers), indent=2)}')
+    print(f'First 500: {r.read().decode()[:500]}')
+except urllib.error.HTTPError as e:
+    print(f'Status: {e.code}')
+    print(f'Headers: {json.dumps(dict(e.headers), indent=2)}')
+    print(f'Body: {e.read().decode()[:500]}')
+
+# Test 2: urllib with browser-like headers
+print()
+print('=== Test 2: urllib (Chrome UA + headers) ===')
+try:
+    req = urllib.request.Request(
+        'https://chat.deepseek.com/sign_up',
+        headers={
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/131.0.0.0 Safari/537.36',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+            'Accept-Language': 'en-US,en;q=0.9',
+        }
+    )
+    r = urllib.request.urlopen(req, timeout=15)
+    print(f'Status: {r.status}')
+    print(f'First 500: {r.read().decode()[:500]}')
+except urllib.error.HTTPError as e:
+    print(f'Status: {e.code}')
+    print(f'Body: {e.read().decode()[:500]}')
+
+# Test 3: cloudscraper
+print()
+print('=== Test 3: cloudscraper ===')
+try:
+    import cloudscraper
+    scraper = cloudscraper.create_scraper()
+    r = scraper.get('https://chat.deepseek.com/sign_up', timeout=30)
+    print(f'Status: {r.status_code}')
+    print(f'x-amzn-waf-action: {r.headers.get(\"x-amzn-waf-action\")}')
+    print(f'First 500: {r.text[:500]}')
+except Exception as e:
+    print(f'Error: {e}')
+
+# Test 4: API endpoint for comparison
+print()
+print('=== Test 4: API endpoint ===')
+try:
+    import uuid
+    payload = json.dumps({'email':'test@test.com','scenario':'register','device_id':str(uuid.uuid4()),'locale':'en_US','turnstile_token':''}).encode()
+    req = urllib.request.Request(
+        'https://chat.deepseek.com/api/v0/users/create_email_verification_code',
+        data=payload, method='POST',
+        headers={'Content-Type':'application/json', 'User-Agent': 'Mozilla/5.0 Chrome/131.0.0.0'}
+    )
+    r = urllib.request.urlopen(req, timeout=15)
+    print(f'Status: {r.status}')
+    print(f'Body: {r.read().decode()[:300]}')
+except urllib.error.HTTPError as e:
+    print(f'Status: {e.code}')
+    print(f'Body: {e.read().decode()[:300]}')
+"
