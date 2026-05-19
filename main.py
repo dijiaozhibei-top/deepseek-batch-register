@@ -1,12 +1,12 @@
+import asyncio
 import csv
 import logging
 import os
 import sys
 import time
-import asyncio
 
 import config
-from playwright_register import DeepSeekPlaywrightRegister
+from deepseek_client import DeepSeekAPIClient
 from email_client import EmailClient
 
 os.makedirs("logs", exist_ok=True)
@@ -41,9 +41,9 @@ def build_alias_email(base_account: str, index: int) -> str:
     return f"{name}+{index}@{domain}"
 
 
-async def main_async():
+def main():
     logger.info("=" * 50)
-    logger.info("DeepSeek 批量注册工具启动 (Playwright)")
+    logger.info("DeepSeek 批量注册工具启动 (API)")
     logger.info(f"目标邮箱: {config.GMAIL_ACCOUNT}")
     logger.info(f"注册数量: {config.COUNT}")
     logger.info(f"起始索引: {config.START_INDEX}")
@@ -60,16 +60,15 @@ async def main_async():
         logger.info(f"\n--- 正在注册第 {i} 个账号: {alias_email} ---")
 
         try:
-            client = DeepSeekPlaywrightRegister(
+            client = DeepSeekAPIClient(
                 base_url=config.DEEPSEEK_BASE_URL,
                 proxy=config.PROXY,
-                headless=True,
             )
 
-            result = await client.register_account(
+            result = client.register_account(
                 email=alias_email,
                 password_length=config.PASSWORD_LENGTH,
-                code_retries=12,
+                max_code_retries=12,
                 code_interval=10,
             )
 
@@ -80,7 +79,7 @@ async def main_async():
                 fail_count += 1
 
         except Exception as e:
-            logger.exception(f"[{alias_email}] 注册过程发生异常: {e}")
+            logger.exception(f"[{alias_email}] 注册异常: {e}")
             fail_count += 1
 
         if i < config.START_INDEX + config.COUNT - 1:
@@ -95,10 +94,6 @@ async def main_async():
     logger.info("=" * 50)
 
     return 0 if fail_count == 0 else 1
-
-
-def main():
-    return asyncio.run(main_async())
 
 
 if __name__ == "__main__":
