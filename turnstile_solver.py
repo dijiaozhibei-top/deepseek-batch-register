@@ -38,20 +38,23 @@ def solve_turnstile(max_wait: int = 90) -> str | None:
 
             title = driver.title
             html = driver.page_source
+            html_lower = html.lower()
 
-            # Stage 1: AWS WAF challenge (title is empty)
-            if not title or "awsWafCookie" in html or "challenge.js" in html:
-                logger.info(f"AWS WAF solving... ({i+1}/{max_wait//2})")
+            logger.info(f"[{i+1}] title='{title}' html_len={len(html)}")
+
+            # Stage 1: AWS WAF challenge (empty title or challenge keywords)
+            if not title or "awswaf" in html_lower or "challenge.js" in html_lower or "gokuprops" in html_lower:
+                logger.info(f"AWS WAF challenge still present...")
                 continue
 
             # Stage 2: Real DeepSeek page loaded
-            if "DeepSeek" in title or "deepseek" in html.lower():
+            if "deepseek" in title or "deepseek" in html_lower:
                 # Check if Turnstile is available
                 has_turnstile = driver.execute_script(
                     "return typeof turnstile !== 'undefined' && turnstile !== null"
                 )
+                logger.info(f"Page loaded, Turnstile={'yes' if has_turnstile else 'no'}")
                 if not has_turnstile:
-                    logger.info(f"Page loaded but Turnstile not ready yet ({i+1}/{max_wait//2})")
                     continue
 
                 # Turnstile available - render widget and get token
@@ -81,9 +84,9 @@ def solve_turnstile(max_wait: int = 90) -> str | None:
                     logger.info(f"Got Turnstile token ({len(token)} chars)")
                     return token
 
-                logger.debug(f"Waiting for Turnstile token... ({i+1}/{max_wait//2})")
+                logger.info(f"Turnstile render returned no token")
             else:
-                logger.debug(f"Current title: '{title}' ({i+1}/{max_wait//2})")
+                logger.info(f"Unknown page state, waiting...")
 
         logger.error("Timed out waiting for Turnstile token")
         return None
