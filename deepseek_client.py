@@ -2,9 +2,10 @@ import json
 import logging
 import random
 import string
+import urllib.request
 import uuid
 
-from curl_cffi import requests
+import ssl
 
 logger = logging.getLogger(__name__)
 
@@ -12,55 +13,72 @@ logger = logging.getLogger(__name__)
 class DeepSeekAPIClient:
     def __init__(self, base_url: str = "https://chat.deepseek.com", proxy: str = ""):
         self.base_url = base_url.rstrip("/")
-        self.session = requests.Session(impersonate="chrome131")
+        self.proxy = proxy
 
-        if proxy:
-            self.session.proxies = {"http": proxy, "https": proxy}
-            logger.info(f"使用代理: {proxy}")
+    def _request(self, method: str, path: str, payload: dict) -> tuple[int, str]:
+        url = f"{self.base_url}{path}"
+        data = json.dumps(payload).encode("utf-8")
 
-        self.session.headers.update({
-            "Accept": "application/json, text/plain, */*",
-            "Accept-Language": "en-US,en;q=0.9",
-            "Content-Type": "application/json",
-            "Origin": self.base_url,
-            "Referer": f"{self.base_url}/sign_up",
-        })
+        req = urllib.request.Request(
+            url, data=data, method=method,
+            headers={
+                "Accept": "application/json, text/plain, */*",
+                "Accept-Language": "en-US,en;q=0.9",
+                "Content-Type": "application/json",
+                "Origin": self.base_url,
+                "Referer": f"{self.base_url}/sign_up",
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+            }
+        )
+
+        if self.proxy:
+            proxy_handler = urllib.request.ProxyHandler({"http": self.proxy, "https": self.proxy})
+            opener = urllib.request.build_opener(proxy_handler)
+            resp = opener.open(req, timeout=30)
+        else:
+            ctx = ssl.create_default_context()
+            resp = urllib.request.urlopen(req, timeout=30, context=ctx)
+
+        body = resp.read().decode("utf-8", errors="replace")
+        return resp.status, body
 
     def send_code(self, email: str) -> bool:
-        url = f"{self.base_url}/api/v0/users/create_email_verification_code"
         payload = {
             "email": email,
-            "turnstile_token": "dummy",
+            "turnstile_token": "any",
             "device_id": str(uuid.uuid4()),
             "scenario": "signUp",
             "locale": "en_US",
         }
 
         try:
-            resp = self.session.post(url, data=json.dumps(payload), timeout=30)
-            logger.debug(f"send-code: status={resp.status_code}, body={resp.text[:500]}")
+            status, body = self._request("POST", "/api/v0/users/create_email_verification_code", payload)
+            logger.debug(f"send-code: status={status}, body={body[:500]}")
 
-            if resp.status_code == 200:
-                data = resp.json()
+            if status == 200:
+                data = json.loads(body)
                 if data.get("code") == 0:
                     logger.info(f"[{email}] 验证码发送成功")
                     return True
                 else:
                     logger.warning(f"[{email}] 返回: {data}")
                     return False
-            elif resp.status_code == 422:
-                logger.error(f"[{email}] 参数错误: {resp.text[:500]}")
+            elif status == 422:
+                logger.error(f"[{email}] 参数错误: {body[:500]}")
                 return False
             else:
-                logger.error(f"[{email}] HTTP {resp.status_code}: {resp.text[:300]}")
+                logger.error(f"[{email}] HTTP {status}: {body[:300]}")
                 return False
 
+        except urllib.error.HTTPError as e:
+            body = e.read().decode("utf-8", errors="replace")
+            logger.error(f"[{email}] HTTP {e.code}: {body[:300]}")
+            return False
         except Exception as e:
             logger.error(f"[{email}] 异常: {e}")
             return False
 
     def register(self, email: str, code: str, password: str) -> dict | None:
-        url = f"{self.base_url}/api/v0/users/register"
         payload = {
             "email": email,
             "password": password,
@@ -68,11 +86,11 @@ class DeepSeekAPIClient:
         }
 
         try:
-            resp = self.session.post(url, json=payload, timeout=30)
-            logger.debug(f"register: status={resp.status_code}, body={resp.text[:500]}")
+            status, body = self._request("POST", "/api/v0/users/register", payload)
+            logger.debug(f"register: status={status}, body={body[:500]}")
 
-            if resp.status_code == 200:
-                data = resp.json()
+            if status == 200:
+                data = json.loads(body)
                 if data.get("code") == 0:
                     token = (
                         data.get("data", {}).get("biz_data", {}).get("user", {}).get("token")
@@ -84,9 +102,13 @@ class DeepSeekAPIClient:
                     logger.warning(f"[{email}] 返回: {data}")
                     return None
             else:
-                logger.error(f"[{email}] HTTP {resp.status_code}: {resp.text[:300]}")
+                logger.error(f"[{email}] HTTP {status}: {body[:300]}")
                 return None
 
+        except urllib.error.HTTPError as e:
+            body = e.read().decode("utf-8", errors="replace")
+            logger.error(f"[{email}] HTTP {e.code}: {body[:300]}")
+            return None
         except Exception as e:
             logger.error(f"[{email}] 异常: {e}")
             return None
