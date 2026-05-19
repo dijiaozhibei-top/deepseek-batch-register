@@ -3,3 +3,6 @@ __pycache__/
 logs/
 accounts.csv
 .env
+check_logs.py
+get_logs.py
+get_logs2.py

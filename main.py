@@ -8,6 +8,8 @@ import config
 from deepseek_client import DeepSeekClient
 from email_client import EmailClient
 
+os.makedirs("logs", exist_ok=True)
+
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(message)s",
