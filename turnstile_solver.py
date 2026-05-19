@@ -1,6 +1,9 @@
 import asyncio
 import logging
-import nodriver as uc
+import undetected_chromedriver as uc
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
 
 logger = logging.getLogger(__name__)
 
@@ -8,42 +11,40 @@ TURNSTILE_SITEKEY = "0x4AAAAAAA1jQEh8YFk064tz"
 SIGNUP_URL = "https://chat.deepseek.com/sign_up"
 
 
-async def get_turnstile_token(max_wait: int = 90) -> str | None:
-    browser = None
+def solve_turnstile(max_wait: int = 90) -> str | None:
+    driver = None
     try:
-        browser = await uc.start(
-            headless=True,
-            additional_arguments=[
-                "--disable-blink-features=AutomationControlled",
-                "--no-sandbox",
-                "--disable-dev-shm-usage",
-                "--window-size=1920,1080",
-            ],
-        )
+        options = uc.ChromeOptions()
+        options.add_argument("--disable-blink-features=AutomationControlled")
+        options.add_argument("--no-sandbox")
+        options.add_argument("--disable-dev-shm-usage")
+        options.add_argument("--window-size=1920,1080")
+        options.add_argument("--headless=new")
 
-        page = await browser.get(SIGNUP_URL)
-        await page.sleep(8)
+        driver = uc.Chrome(options=options)
+
+        driver.get(SIGNUP_URL)
+        driver.implicitly_wait(10)
+
+        import time
+        time.sleep(5)
+
+        html = driver.page_source
+        if "ERROR" in html[:500] and "request could not be satisfied" in html[:500]:
+            logger.error("Cloudflare WAF blocked the page")
+            return None
 
         for i in range(max_wait // 3):
-            await page.sleep(3)
+            time.sleep(3)
 
-            try:
-                html = await page.get_content()
-            except Exception:
-                continue
-
-            if "ERROR" in html[:500] and "request could not be satisfied" in html[:500]:
-                logger.error("Cloudflare WAF blocked the page")
-                return None
-
-            has_turnstile = await page.evaluate(
-                "typeof turnstile !== 'undefined' && turnstile !== null"
+            has_turnstile = driver.execute_script(
+                "return typeof turnstile !== 'undefined' && turnstile !== null"
             )
             if not has_turnstile:
                 continue
 
-            token = await page.evaluate(f"""
-                () => new Promise((resolve) => {{
+            token = driver.execute_script(f"""
+                return new Promise((resolve) => {{
                     try {{
                         const div = document.createElement('div');
                         div.id = 'cf-turnstile-solver';
@@ -72,24 +73,12 @@ async def get_turnstile_token(max_wait: int = 90) -> str | None:
 
         logger.error("Timed out waiting for Turnstile token")
         return None
+    except Exception as e:
+        logger.error(f"Turnstile solver error: {e}")
+        return None
     finally:
-        if browser:
+        if driver:
             try:
-                await browser.stop()
+                driver.quit()
             except Exception:
                 pass
-
-
-def solve_turnstile(max_wait: int = 90) -> str | None:
-    """Synchronous wrapper for get_turnstile_token."""
-    try:
-        return asyncio.run(get_turnstile_token(max_wait))
-    except RuntimeError as e:
-        # Handle case where event loop is already running
-        logger.warning(f"Event loop conflict, trying new loop: {e}")
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        try:
-            return loop.run_until_complete(get_turnstile_token(max_wait))
-        finally:
-            loop.close()
