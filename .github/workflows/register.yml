@@ -37,13 +37,14 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
-          pip install nodriver
 
       - name: Setup Chrome for nodriver
-        uses: browser-actions/setup-chrome@v1
-        with:
-          chrome-version: stable
-      - run: echo "CHROME_PATH=$(which google-chrome-stable)" >> $GITHUB_ENV
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y google-chrome-stable || { \
+            wget -q -O /tmp/chrome.deb https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb; \
+            sudo dpkg -i /tmp/chrome.deb || sudo apt-get install -f -y; \
+          }
 
       - name: Run batch register
         env:
